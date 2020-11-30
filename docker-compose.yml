@@ -1,0 +1,168 @@
+# Namesilo timeout issue with lego (what traefik uses for acme encryption)
+# https://github.com/go-acme/lego/issues/967#issuecomment-533782135
+# Guide that helped me create this config, but had to move https redirect to entrypoints
+# https://medium.com/@containeroo/traefik-2-0-docker-a-simple-step-by-step-guide-e0be0c17cfa5
+# https://medium.com/@containeroo/traefik-2-0-wildcard-lets-encrypt-certificates-1658370adc68
+version: "3.6"
+services:
+  traefik:
+    image: "traefik:v2.3"
+    container_name: "traefik"
+    env_file:
+      # Must have NAMESILO_API_KEY
+      - "./.env"
+    command:
+      - "--log.level=DEBUG"
+      - "--api.dashboard=true"
+      - "--api.insecure=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker=true"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.namesilo.acme.email=binamkayastha@gmail.com"
+      - "--certificatesresolvers.namesilo.acme.dnschallenge=true"
+      - "--certificatesresolvers.namesilo.acme.dnschallenge.provider=namesilo"
+      - "--certificatesresolvers.namesilo.acme.storage=/letsencrypt/acme.json"
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"
+    volumes:
+      - "./letsencrypt:/letsencrypt"
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+    labels:
+      - "traefik.enable=true"
+      # Certs added from one router, will apply to all routers.
+      - "traefik.http.routers.wildcard-certs.tls=true"
+      - "traefik.http.routers.wildcard-certs.tls.certresolver=namesilo"
+      - "traefik.http.routers.wildcard-certs.tls.domains[0].main=binamkayastha.com"
+      - "traefik.http.routers.wildcard-certs.tls.domains[0].sans=*.binamkayastha.com"
+
+      # dashboard
+      #- "traefik.http.routers.traefik.rule=Host(`traefik.binamkayastha.com`)"
+      #- "traefik.http.routers.traefik.tls=true"
+      #- "traefik.http.routers.traefik.entrypoints=websecure"
+      #- "traefik.http.routers.traefik.service=api@internal"
+      #- "traefik.http.routers.traefik.middlewares=authtraefik"
+      #- "traefik.http.middlewares.authtraefik.basicauth.users=removed"
+
+
+
+  binamkayastha:
+    build:
+      context: .
+      dockerfile: http-server.Dockerfile
+    # https://www.npmjs.com/package/http-server
+    command: http-server .
+    volumes:
+      - ./all-webapps/binamkayastha.github.io/src:/usr/app
+    ports:
+      - 8081:8080
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.binamkayastha-secure.entrypoints=websecure"
+      - "traefik.http.routers.binamkayastha-secure.rule=Host(`www.binamkayastha.com`)"
+      - "traefik.http.routers.binamkayastha-secure.tls=true"
+
+  iqp:
+    build:
+      context: .
+      dockerfile: http-server.Dockerfile
+    # https://www.npmjs.com/package/http-server
+    command: http-server .
+    volumes:
+      - ./all-webapps/IQP:/usr/app
+    ports:
+      - 8082:8080
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.iqp-secure.entrypoints=websecure"
+      - "traefik.http.routers.iqp-secure.rule=Host(`iqp.binamkayastha.com`)"
+      - "traefik.http.routers.iqp-secure.tls=true"
+
+  leisscavenger:
+    build:
+      context: .
+      dockerfile: http-server.Dockerfile
+    # https://www.npmjs.com/package/http-server
+    command: http-server .
+    volumes:
+      - ./all-webapps/leisscavenger:/usr/app
+    ports:
+      - 8083:8080
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.leisscavenger-secure.entrypoints=websecure"
+      - "traefik.http.routers.leisscavenger-secure.rule=Host(`leisscavenger.binamkayastha.com`)"
+      - "traefik.http.routers.leisscavenger-secure.tls=true"
+
+  blog:
+    build:
+      context: .
+      args:
+        PROJ_LOCATION: /all-webapps/blog
+      dockerfile: node-start.Dockerfile
+    command: npm run server
+    #build:
+    #  context: .
+    #  dockerfile: http-server.Dockerfile
+    ## https://www.npmjs.com/package/http-server
+    #command: http-server .
+    #volumes:
+    #  - ./all-webapps/blog:/usr/app
+    ports:
+      - 8084:4000
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.blog-secure.entrypoints=websecure"
+      - "traefik.http.routers.blog-secure.rule=Host(`blog.binamkayastha.com`)"
+      - "traefik.http.routers.blog-secure.tls=true"
+
+  life-economy:
+    build:
+      context: .
+      dockerfile: http-server.Dockerfile
+    # https://www.npmjs.com/package/http-server
+    command: http-server .
+    volumes:
+      - ./all-webapps/life-economy:/usr/app
+    ports:
+      - 8085:8080
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.life-economy-secure.entrypoints=websecure"
+      - "traefik.http.routers.life-economy-secure.rule=Host(`life-economy.binamkayastha.com`)"
+      - "traefik.http.routers.life-economy-secure.tls=true"
+
+  light-docs:
+    build:
+      context: .
+      args:
+        PROJ_LOCATION: /all-webapps/light-docs
+      dockerfile: node-start.Dockerfile
+    command: npm start
+    ports:
+      - 9086:5000
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.light-docs-secure.entrypoints=websecure"
+      - "traefik.http.routers.light-docs-secure.rule=Host(`light-docs.binamkayastha.com`)"
+      - "traefik.http.routers.light-docs-secure.tls=true"
+
+  prof-ciaraldi-jokes:
+    build:
+      context: .
+      dockerfile: http-server.Dockerfile
+    # https://www.npmjs.com/package/http-server
+    command: http-server .
+    volumes:
+      - ./all-webapps/ProfCiaraldiJokes:/usr/app
+    ports:
+      - 8087:8080
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.prof-ciaraldi-jokes-secure.entrypoints=websecure"
+      - "traefik.http.routers.prof-ciaraldi-jokes-secure.rule=Host(`prof-ciaraldi-jokes.binamkayastha.com`)"
+      - "traefik.http.routers.prof-ciaraldi-jokes-secure.tls=true"
